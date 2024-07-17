@@ -1,1 +1,37 @@
+# Copyright (c) IBM Corporation 2019, 2020
+# Apache License, Version 2.0 (see https://opensource.org/licenses/Apache-2.0)
 
+---
+- hosts: all
+  gather_facts: false
+  collections:
+   - ibm.power_ibmi
+
+  tasks:
+    - name: Display all the users with *ALLOBJ special authority
+      ibmi_sql_query:
+        sql: "SELECT AUTHORIZATION_NAME, STATUS, NO_PASSWORD_INDICATOR, PREVIOUS_SIGNON,
+              TEXT_DESCRIPTION
+              FROM QSYS2.USER_INFO
+              WHERE SPECIAL_AUTHORITIES LIKE '%*ALLOBJ%'
+              OR AUTHORIZATION_NAME IN (
+              SELECT USER_PROFILE_NAME
+              FROM QSYS2.GROUP_PROFILE_ENTRIES
+              WHERE GROUP_PROFILE_NAME IN (
+              SELECT AUTHORIZATION_NAME
+              FROM QSYS2.USER_INFO
+              WHERE SPECIAL_AUTHORITIES like '%*ALLOBJ%'
+              )
+              )
+              ORDER BY AUTHORIZATION_NAME;"
+      register: user_profile    
+
+    - name: copy the output to a local file
+      copy:
+        content: "{{ user_profile }}"
+        dest: "/home/hello.txt"
+       delegate_to: localhost
+
+
+    - debug:
+        var: user_profile
